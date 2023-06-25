@@ -1,0 +1,11 @@
+/target
+/.idea
+/output
+/Image
+/package-file
+/RESERVED
+/BOOT
+/embedded-update.img
+/update.img
+/outputpackage-file
+/out
