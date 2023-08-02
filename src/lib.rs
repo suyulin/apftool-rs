@@ -117,15 +117,15 @@ fn unpack_rkfw(buf: &[u8], dst_path: &str) -> Result<()> {
         buf[8],
         (buf[7] as u16) << 8 + buf[6] as u16
     );
-    println!(
-        "date: {}-{:02}-{:02} {:02}:{:02}:{:02}",
-        (buf[0x0f] as u16) << 8 + buf[0x0e] as u16,
-        buf[0x10],
-        buf[0x11],
-        buf[0x12],
-        buf[0x13],
-        buf[0x14]
-    );
+    // println!(
+    //     "date: {}-{:02}-{:02} {:02}:{:02}:{:02}",
+    //     (buf[0x0f] as u16) << 8 + buf[0x0e] as u16,
+    //     buf[0x10],
+    //     buf[0x11],
+    //     buf[0x12],
+    //     buf[0x13],
+    //     buf[0x14]
+    // );
 
     match buf[0x15] {
         0x50 => chip = Some("rk29xx"),
@@ -147,9 +147,9 @@ fn unpack_rkfw(buf: &[u8], dst_path: &str) -> Result<()> {
     let ioff = get_u32_le(&buf[0x19..]);
     let isize: u32 = get_u32_le(&buf[0x1d..]);
 
-    if &buf[ioff as usize..ioff as usize + 4] != b"BOOT" {
-        panic!("cannot find BOOT signature");
-    }
+    // if &buf[ioff as usize..ioff as usize + 4] != b"BOOT" {
+    //     panic!("cannot find BOOT signature");
+    // }
 
     println!(
         "{:08x}-{:08x} {:26} (size: {})",
