@@ -258,13 +258,13 @@ fn unpack_rkafp(file_path: &str, dst_path: &str) -> Result<()> {
     }
     create_dir_all(format!("{}/Image", dst_path))?;
     unsafe {
-        println!("manufacturer: {}", CStr::from_ptr(header.manufacturer.as_ptr() as *const i8).to_str()?);
-        println!("model: {}", CStr::from_ptr(header.model.as_ptr() as *const i8).to_str()?);
+        println!("manufacturer: {}", CStr::from_ptr(header.manufacturer.as_ptr() as *const std::ffi::c_char).to_str()?);
+        println!("model: {}", CStr::from_ptr(header.model.as_ptr() as *const std::ffi::c_char).to_str()?);
     }
     for i in 0..header.num_parts {
         let part = &header.parts[i as usize];
         unsafe {
-            let cstr = CStr::from_ptr(part.full_path.as_ptr() as *const i8);
+            let cstr = CStr::from_ptr(part.full_path.as_ptr() as *const std::ffi::c_char);
             let part_full_path = cstr.to_str()?;
             if part_full_path == "SELF" || part_full_path == "RESERVED" {
                 continue;
