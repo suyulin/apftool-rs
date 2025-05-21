@@ -1,0 +1,36 @@
+name: Rust Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    - name: Build
+      run: cargo build --release --all-targets
+    - name: Upload artifact Linux/macOS
+      if: runner.os != 'Windows'
+      uses: actions/upload-artifact@v3
+      with:
+        name: apftool-rs-${{ matrix.os }}
+        path: target/release/apftool-rs
+    - name: Upload artifact Windows
+      if: runner.os == 'Windows'
+      uses: actions/upload-artifact@v3
+      with:
+        name: apftool-rs-${{ matrix.os }}
+        path: target/release/apftool-rs.exe
