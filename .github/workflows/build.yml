@@ -1,0 +1,161 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: linux-x86_64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            name: linux-aarch64
+          
+          # macOS builds
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-aarch64
+          
+          # Windows builds
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            name: windows-aarch64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Install cross-compilation tools (Linux)
+      if: matrix.os == 'ubuntu-latest' && matrix.target == 'aarch64-unknown-linux-gnu'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Prepare artifacts (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        mkdir -p artifacts
+        cp target/${{ matrix.target }}/release/afptool-rs artifacts/afptool-rs-${{ matrix.name }}
+        chmod +x artifacts/afptool-rs-${{ matrix.name }}
+
+    - name: Prepare artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir artifacts
+        copy target\${{ matrix.target }}\release\afptool-rs.exe artifacts\afptool-rs-${{ matrix.name }}.exe
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: afptool-rs-${{ matrix.name }}
+        path: artifacts/
+
+  # Create universal macOS binary
+  create-universal-macos:
+    needs: build
+    runs-on: macos-latest
+    steps:
+    - name: Download macOS x86_64 artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: afptool-rs-macos-x86_64
+        path: ./x86_64
+
+    - name: Download macOS aarch64 artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: afptool-rs-macos-aarch64
+        path: ./aarch64
+
+    - name: Create universal binary
+      run: |
+        mkdir -p artifacts
+        lipo -create ./x86_64/afptool-rs-macos-x86_64 ./aarch64/afptool-rs-macos-aarch64 -output artifacts/afptool-rs-macos-universal
+        chmod +x artifacts/afptool-rs-macos-universal
+
+    - name: Upload universal macOS binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: afptool-rs-macos-universal
+        path: artifacts/
+
+  # Create release when tagged
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, create-universal-macos]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Create release archives
+      run: |
+        cd artifacts
+        
+        # Linux
+        tar -czf afptool-rs-linux-x86_64.tar.gz -C afptool-rs-linux-x86_64 .
+        tar -czf afptool-rs-linux-aarch64.tar.gz -C afptool-rs-linux-aarch64 .
+        
+        # macOS
+        tar -czf afptool-rs-macos-x86_64.tar.gz -C afptool-rs-macos-x86_64 .
+        tar -czf afptool-rs-macos-aarch64.tar.gz -C afptool-rs-macos-aarch64 .
+        tar -czf afptool-rs-macos-universal.tar.gz -C afptool-rs-macos-universal .
+        
+        # Windows
+        cd afptool-rs-windows-x86_64 && zip -r ../afptool-rs-windows-x86_64.zip . && cd ..
+        cd afptool-rs-windows-aarch64 && zip -r ../afptool-rs-windows-aarch64.zip . && cd ..
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/afptool-rs-linux-x86_64.tar.gz
+          artifacts/afptool-rs-linux-aarch64.tar.gz
+          artifacts/afptool-rs-macos-x86_64.tar.gz
+          artifacts/afptool-rs-macos-aarch64.tar.gz
+          artifacts/afptool-rs-macos-universal.tar.gz
+          artifacts/afptool-rs-windows-x86_64.zip
+          artifacts/afptool-rs-windows-aarch64.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
