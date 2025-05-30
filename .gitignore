@@ -9,3 +9,7 @@
 /update.img
 /outputpackage-file
 /out
+.DS_Store
+
+# Keep .cargo/config.toml for cross-compilation settings
+# .cargo/
