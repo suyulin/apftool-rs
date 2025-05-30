@@ -21,6 +21,17 @@ cargo build --release
 ./build.sh
 ```
 
+### GitHub Actions
+This project includes automated CI/CD with GitHub Actions that builds binaries for:
+- Linux x86_64
+- Linux ARM64 (aarch64)
+- macOS x86_64
+- macOS ARM64 (Apple Silicon)
+- macOS Universal Binary
+- Windows x86_64
+
+Releases are automatically created when you push a version tag (e.g., `v1.0.0`).
+
 ## Usage
 
 ```bash

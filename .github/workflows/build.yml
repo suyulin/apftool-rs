@@ -19,31 +19,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: linux-x86_64
-            use-cross: false
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            name: linux-aarch64
-            use-cross: true
           
           # macOS builds
           - os: macos-latest
             target: x86_64-apple-darwin
             name: macos-x86_64
-            use-cross: false
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macos-aarch64
-            use-cross: false
           
           # Windows builds
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: windows-x86_64
-            use-cross: false
-          - os: windows-latest
-            target: aarch64-pc-windows-msvc
-            name: windows-aarch64
-            use-cross: false
 
     runs-on: ${{ matrix.os }}
 
@@ -55,10 +43,6 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
-    - name: Install cross
-      if: matrix.use-cross
-      run: cargo install cross --git https://github.com/cross-rs/cross
-
     - name: Cache cargo registry
       uses: actions/cache@v4
       with:
@@ -68,13 +52,8 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Build (native)
-      if: '!matrix.use-cross'
+    - name: Build
       run: cargo build --release --target ${{ matrix.target }}
-
-    - name: Build (cross)
-      if: matrix.use-cross
-      run: cross build --release --target ${{ matrix.target }}
 
     - name: Prepare artifacts (Unix)
       if: matrix.os != 'windows-latest'
@@ -93,6 +72,34 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: afptool-rs-${{ matrix.name }}
+        path: artifacts/
+
+  # Build Linux ARM64 using Ubuntu ARM64 runner
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Build ARM64 binary in Docker
+      run: |
+        docker run --rm -v "$PWD":/workspace -w /workspace \
+          --platform linux/arm64 \
+          rust:1.75 \
+          sh -c "
+            apt-get update && apt-get install -y build-essential &&
+            cargo build --release &&
+            mkdir -p artifacts &&
+            cp target/release/afptool-rs artifacts/afptool-rs-linux-aarch64 &&
+            chmod +x artifacts/afptool-rs-linux-aarch64
+          "
+
+    - name: Upload ARM64 artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: afptool-rs-linux-aarch64
         path: artifacts/
 
   # Create universal macOS binary
@@ -127,7 +134,7 @@ jobs:
   # Create release when tagged
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, create-universal-macos]
+    needs: [build, build-linux-arm64, create-universal-macos]
     runs-on: ubuntu-latest
     steps:
     - name: Download all artifacts
@@ -150,7 +157,6 @@ jobs:
         
         # Windows
         cd afptool-rs-windows-x86_64 && zip -r ../afptool-rs-windows-x86_64.zip . && cd ..
-        cd afptool-rs-windows-aarch64 && zip -r ../afptool-rs-windows-aarch64.zip . && cd ..
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
@@ -162,7 +168,6 @@ jobs:
           artifacts/afptool-rs-macos-aarch64.tar.gz
           artifacts/afptool-rs-macos-universal.tar.gz
           artifacts/afptool-rs-windows-x86_64.zip
-          artifacts/afptool-rs-windows-aarch64.zip
         draft: false
         prerelease: false
         generate_release_notes: true
