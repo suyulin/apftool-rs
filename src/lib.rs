@@ -115,7 +115,7 @@ fn unpack_rkfw(buf: &[u8], dst_path: &str) -> Result<()> {
         "version: {}.{}.{}",
         buf[9],
         buf[8],
-        (buf[7] as u16) << 8 + buf[6] as u16
+        ((buf[7] as u16) << 8) + buf[6] as u16
     );
     // println!(
     //     "date: {}-{:02}-{:02} {:02}:{:02}:{:02}",
