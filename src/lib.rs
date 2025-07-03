@@ -2,7 +2,6 @@ use std::{mem, str};
 use std::fs::{create_dir_all, File};
 use std::io::{Read, Seek, Write};
 use std::path::Path;
-use std::ffi::CStr;
 use anyhow::{anyhow, Result};
 
 pub const RKAFP_MAGIC: &str = "RKAF";
@@ -73,7 +72,7 @@ impl UpdateHeader {
     }
 
     pub fn to_bytes(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts(self as *const _ as *const u8, mem::size_of::<UpdatePart>()) }
+        unsafe { std::slice::from_raw_parts(self as *const _ as *const u8, mem::size_of::<UpdateHeader>()) }
     }
 }
 
@@ -115,7 +114,7 @@ fn unpack_rkfw(buf: &[u8], dst_path: &str) -> Result<()> {
         "version: {}.{}.{}",
         buf[9],
         buf[8],
-        (buf[7] as u16) << 8 + buf[6] as u16
+        ((buf[7] as u16) << 8) + buf[6] as u16
     );
     // println!(
     //     "date: {}-{:02}-{:02} {:02}:{:02}:{:02}",
@@ -160,7 +159,7 @@ fn unpack_rkfw(buf: &[u8], dst_path: &str) -> Result<()> {
     );
     create_dir_all(dst_path)?;
     write_file(
-        &Path::new(format!("{}/BOOT", dst_path).as_mut()),
+        &Path::new(&format!("{}/BOOT", dst_path)),
         &buf[ioff as usize..ioff as usize + (isize as usize)],
     )?;
 
@@ -179,7 +178,7 @@ fn unpack_rkfw(buf: &[u8], dst_path: &str) -> Result<()> {
         isize
     );
     write_file(
-        &Path::new(format!("{}/embedded-update.img", dst_path).as_mut()),
+        &Path::new(&format!("{}/embedded-update.img", dst_path)),
         &buf[ioff as usize..ioff as usize + isize as usize],
     )?;
     Ok(())
@@ -205,15 +204,15 @@ pub fn info_and_fatal(is_fatal: bool, message: String) {
 }
 #[macro_export]
 macro_rules! info {
-    ($message:expr) => {
-        info_and_fatal(false, $message);
+    ($($arg:tt)*) => {
+        info_and_fatal(false, format!($($arg)*));
     };
 }
 
 #[macro_export]
 macro_rules! fatal {
-    ($message:expr) => {
-        info_and_fatal(true, $message);
+    ($($arg:tt)*) => {
+        info_and_fatal(true, format!($($arg)*));
     };
 }
 fn extract_file(fp: &mut File, offset: u64, len: u64, full_path: &str) -> Result<()> {
@@ -257,15 +256,21 @@ fn unpack_rkafp(file_path: &str, dst_path: &str) -> Result<()> {
         eprintln!("update_header.length cannot be correct, cannot check CRC");
     }
     create_dir_all(format!("{}/Image", dst_path))?;
-    unsafe {
-        println!("manufacturer: {}", CStr::from_ptr(header.manufacturer.as_ptr() as *const std::ffi::c_char).to_str()?);
-        println!("model: {}", CStr::from_ptr(header.model.as_ptr() as *const std::ffi::c_char).to_str()?);
-    }
+    // 安全地从null-terminated字符串中提取文本
+    let manufacturer = std::ffi::CStr::from_bytes_until_nul(&header.manufacturer)
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_else(|_| "unknown".into());
+    let model = std::ffi::CStr::from_bytes_until_nul(&header.model)
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_else(|_| "unknown".into());
+    
+    println!("manufacturer: {}", manufacturer);
+    println!("model: {}", model);
     for i in 0..header.num_parts {
         let part = &header.parts[i as usize];
-        unsafe {
-            let cstr = CStr::from_ptr(part.full_path.as_ptr() as *const std::ffi::c_char);
-            let part_full_path = cstr.to_str()?;
+        // 安全地提取路径字符串
+        if let Ok(cstr) = std::ffi::CStr::from_bytes_until_nul(&part.full_path) {
+            let part_full_path = cstr.to_string_lossy();
             if part_full_path == "SELF" || part_full_path == "RESERVED" {
                 continue;
             }
@@ -284,10 +289,7 @@ fn unpack_rkafp(file_path: &str, dst_path: &str) -> Result<()> {
 
 
 fn get_u32_le(slice: &[u8]) -> u32 {
-    ((slice[3] as u32) << 24)
-        + ((slice[2] as u32) << 16)
-        + ((slice[1] as u32) << 8)
-        + slice[0] as u32
+    u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]])
 }
 
 fn write_file(path: &Path, buffer: &[u8]) -> Result<()> {
