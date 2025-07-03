@@ -86,6 +86,35 @@ model: RK3326
 | 0x38 | RK3566 |
 | 0x30 | PX30 |
 
+## Testing
+
+### Run Unit Tests
+
+```bash
+cargo test
+```
+
+### Run All Tests (Including Integration Tests)
+
+```bash
+cargo test -- --include-ignored
+```
+
+### Run Specific Test
+
+```bash
+cargo test test_update_header_from_bytes
+```
+
+### Test Coverage
+
+The test cases cover the following functionality:
+
+- Parsing RKFW and RKAF file headers
+- Unpacking RKFW and RKAF files
+- Command-line interface validation
+- Error handling
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

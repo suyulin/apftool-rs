@@ -86,6 +86,35 @@ model: RK3326
 | 0x38 | RK3566 |
 | 0x30 | PX30 |
 
+## 测试
+
+### 运行单元测试
+
+```bash
+cargo test
+```
+
+### 运行所有测试（包括集成测试）
+
+```bash
+cargo test -- --include-ignored
+```
+
+### 运行特定测试
+
+```bash
+cargo test test_update_header_from_bytes
+```
+
+### 测试覆盖范围
+
+测试用例覆盖以下功能：
+
+- 解析 RKFW 和 RKAF 文件头
+- 解包 RKFW 和 RKAF 文件
+- 命令行接口验证
+- 错误处理
+
 ## 许可证
 
 本项目采用 Apache License 2.0 许可证 - 详见 [LICENSE](LICENSE) 文件。
