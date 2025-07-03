@@ -87,7 +87,7 @@ jobs:
       run: |
         docker run --rm -v "$PWD":/workspace -w /workspace \
           --platform linux/arm64 \
-          rust:1.75 \
+          rust:1.80 \
           sh -c "
             apt-get update && apt-get install -y build-essential &&
             cargo build --release &&
